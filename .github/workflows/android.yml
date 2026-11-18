@@ -21,21 +21,24 @@ jobs:
       CI: false  # CRA treats lint warnings as errors when CI=true
 
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
 
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@v5
         with:
           node-version: 22
           cache: yarn
           cache-dependency-path: frontend/yarn.lock
 
-      - uses: actions/setup-java@v4
+      - uses: actions/setup-java@v5
         with:
           distribution: temurin
           java-version: 21
           cache: gradle
 
       - uses: android-actions/setup-android@v3
+        with:
+          # default list includes the removed legacy 'tools' package
+          packages: 'platform-tools platforms;android-36 build-tools;36.0.0'
 
       - name: Check backend URL
         run: |
