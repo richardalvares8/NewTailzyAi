@@ -1,0 +1,20 @@
+{
+  "appId": "com.tailzyai.app",
+  "appName": "Tailzyai",
+  "webDir": "build",
+  "android": {
+    "allowMixedContent": false
+  },
+  "plugins": {
+    "SplashScreen": {
+      "launchShowDuration": 1000,
+      "backgroundColor": "#FBF9F5",
+      "showSpinner": false
+    },
+    "StatusBar": {
+      "style": "LIGHT",
+      "backgroundColor": "#FBF9F5",
+      "overlaysWebView": false
+    }
+  }
+}
