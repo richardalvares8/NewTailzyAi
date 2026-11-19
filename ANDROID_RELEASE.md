@@ -10,17 +10,38 @@ The app bundles the built web UI and talks to the FastAPI backend over HTTPS.
 - Icon / splash sources: `frontend/assets/` (regenerate with `npx @capacitor/assets generate --android`)
 - Play listing icon: `store-assets/play-store-icon-512.png`
 
-## 1. Host the backend
+## 1. Host the backend (no Emergent needed)
 
-The app needs a publicly reachable backend over **HTTPS** (Android blocks plain HTTP).
-Deploy `backend/` (FastAPI + MongoDB) to any host (Render, Railway, Fly.io, a VPS, ...) and set:
+The app needs the backend running at a public **HTTPS** address. Everything below has a free tier
+and can be done from a phone or tablet browser.
+
+**a. Database - MongoDB Atlas** (mongodb.com/atlas)
+1. Sign up and create a free **M0** cluster.
+2. *Database Access*: add a user with a password (letters and numbers only keeps it simple).
+3. *Network Access*: add `0.0.0.0/0` (Render's addresses change, so allow all).
+4. *Connect -> Drivers*: copy the connection string (`mongodb+srv://...`) and put your password in it.
+
+**b. AI key - Google Gemini** (aistudio.google.com/apikey)
+1. Sign in with a Google account and tap **Create API key**. Copy it.
+
+**c. Server - Render** (render.com)
+1. Sign up with GitHub and allow access to this repository.
+2. **New -> Blueprint**, pick this repo and the branch. Render reads `render.yaml`.
+3. Paste `MONGO_URL` (from a) and `GEMINI_API_KEY` (from b) when asked. `JWT_SECRET` is generated for you.
+4. When it is live, open `https://<your-service>.onrender.com/api/` - it should say `"status":"healthy"`.
+5. Set the GitHub variable `REACT_APP_BACKEND_URL` to `https://<your-service>.onrender.com` and rebuild the APK.
+
+Render's free plan sleeps after ~15 minutes without traffic; the first request after that takes
+about a minute. For a published app, upgrade the service to a paid plan (about $7/month) so it stays awake.
+
+Backend environment variables (`backend/server.py`):
 
 | Variable | Notes |
 |---|---|
-| `MONGO_URL`, `DB_NAME` | e.g. a MongoDB Atlas cluster |
-| `JWT_SECRET` | a long random string - do **not** use the default in `server.py` |
-| `EMERGENT_LLM_KEY` | used by the Copilot chat (see "Known follow-ups") |
-| `CORS_ORIGINS` | include `https://localhost` (the origin the Android app uses) |
+| `MONGO_URL`, `DB_NAME` | MongoDB connection |
+| `JWT_SECRET` | long random string - never the default in `server.py` |
+| `GEMINI_API_KEY` | Copilot chat. `GEMINI_MODEL` optionally overrides the model (default `gemini-flash-latest`) |
+| `CORS_ORIGINS` | `*`, or a list that includes `https://localhost` (the Android app's origin) |
 
 ## 2. Build an APK with GitHub Actions (no local setup needed)
 
@@ -89,9 +110,3 @@ then `yarn android:bundle`.
 - [ ] Data safety form, content rating questionnaire, target audience
 - [ ] Store listing: 512×512 icon (`store-assets/`), 1024×500 feature graphic, 2+ phone screenshots
 - [ ] New personal developer accounts must run a closed test (12+ testers for 14 days) before production
-
-## Known follow-ups
-
-- The Copilot chat uses the `emergentintegrations` package and `EMERGENT_LLM_KEY`, which are tied to
-  the Emergent platform. Outside Emergent, switch the call in `backend/server.py` to an LLM provider
-  SDK with your own API key.

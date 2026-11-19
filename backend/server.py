@@ -12,7 +12,8 @@ import uuid
 from datetime import datetime, timezone, timedelta
 import bcrypt
 import jwt
-from emergentintegrations.llm.chat import LlmChat, UserMessage
+from google import genai
+from google.genai import types
 
 ROOT_DIR = Path(__file__).parent
 load_dotenv(ROOT_DIR / '.env')
@@ -26,6 +27,19 @@ api_router = APIRouter(prefix="/api")
 security = HTTPBearer()
 
 JWT_SECRET = os.environ.get('JWT_SECRET', 'tailzyai-secret-key-2025')
+
+# Copilot chat: Google Gemini. Get a key at https://aistudio.google.com/apikey
+GEMINI_MODEL = os.environ.get('GEMINI_MODEL', 'gemini-flash-latest')
+_gemini_client = None
+
+def get_gemini_client():
+    global _gemini_client
+    if _gemini_client is None:
+        api_key = os.environ.get('GEMINI_API_KEY')
+        if not api_key:
+            raise HTTPException(status_code=503, detail="Copilot is not configured (GEMINI_API_KEY missing)")
+        _gemini_client = genai.Client(api_key=api_key)
+    return _gemini_client
 JWT_ALGORITHM = "HS256"
 
 # Models
@@ -344,6 +358,7 @@ async def get_journal(pet_id: Optional[str] = None, current_user: dict = Depends
 @api_router.post("/chat/message", response_model=ChatMessageResponse)
 async def send_chat_message(msg: ChatMessageCreate, current_user: dict = Depends(get_current_user)):
     user_id = current_user['id']
+    user_timestamp = datetime.now(timezone.utc).isoformat()
     
     # Get user's pets and their data for context
     pets = await db.pets.find({"user_id": user_id}, {"_id": 0}).to_list(100)
@@ -363,17 +378,31 @@ Journal Entries: {journal_entries}
 
 Provide helpful, caring advice about their pets based on this data. Be warm, friendly, and knowledgeable about pet care."""
     
-    # Create chat instance
-    api_key = os.environ.get('EMERGENT_LLM_KEY', '')
-    chat = LlmChat(
-        api_key=api_key,
-        session_id=f"user_{user_id}",
-        system_message=context
-    ).with_model("openai", "gpt-4o")
-    
-    # Send message
-    user_message = UserMessage(text=msg.message)
-    response_text = await chat.send_message(user_message)
+    # Previous turns so the copilot remembers the conversation
+    history = await db.chat_messages.find(
+        {"user_id": user_id}, {"_id": 0, "role": 1, "content": 1}
+    ).sort("timestamp", -1).limit(20).to_list(20)
+    contents = [
+        types.Content(
+            role="model" if m["role"] == "assistant" else "user",
+            parts=[types.Part(text=m["content"])],
+        )
+        for m in reversed(history)
+    ]
+    contents.append(types.Content(role="user", parts=[types.Part(text=msg.message)]))
+
+    try:
+        result = await get_gemini_client().aio.models.generate_content(
+            model=GEMINI_MODEL,
+            contents=contents,
+            config=types.GenerateContentConfig(system_instruction=context),
+        )
+        response_text = result.text or "Sorry, I couldn't come up with an answer. Please try again."
+    except HTTPException:
+        raise
+    except Exception as e:
+        logging.getLogger(__name__).exception("Gemini request failed")
+        raise HTTPException(status_code=502, detail="Copilot is unavailable right now. Please try again.") from e
     
     # Save messages to database
     message_id = str(uuid.uuid4())
@@ -384,7 +413,7 @@ Provide helpful, caring advice about their pets based on this data. Be warm, fri
         "user_id": user_id,
         "role": "user",
         "content": msg.message,
-        "timestamp": timestamp
+        "timestamp": user_timestamp
     }
     await db.chat_messages.insert_one(user_msg_doc)
     

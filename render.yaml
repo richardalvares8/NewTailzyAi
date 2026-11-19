@@ -1,0 +1,24 @@
+# Render Blueprint: deploys the Tailzyai backend.
+# Render dashboard -> New -> Blueprint -> pick this repo. See ANDROID_RELEASE.md.
+services:
+  - type: web
+    name: tailzyai-api
+    runtime: python
+    plan: free
+    rootDir: backend
+    buildCommand: pip install -r requirements.txt
+    startCommand: uvicorn server:app --host 0.0.0.0 --port $PORT
+    healthCheckPath: /api/
+    envVars:
+      - key: PYTHON_VERSION
+        value: "3.12.8"
+      - key: MONGO_URL
+        sync: false   # paste your MongoDB Atlas connection string
+      - key: GEMINI_API_KEY
+        sync: false   # paste your key from aistudio.google.com/apikey
+      - key: DB_NAME
+        value: tailzyai
+      - key: JWT_SECRET
+        generateValue: true
+      - key: CORS_ORIGINS
+        value: "*"

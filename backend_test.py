@@ -1,10 +1,11 @@
+import os
 import requests
 import sys
 import json
 from datetime import datetime
 
 class TailzyaiAPITester:
-    def __init__(self, base_url="https://pet-memory-vault.preview.emergentagent.com"):
+    def __init__(self, base_url=os.environ.get("BACKEND_URL", "http://localhost:8000")):
         self.base_url = base_url
         self.token = None
         self.user_id = None
