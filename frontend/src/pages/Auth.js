@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { motion } from 'framer-motion';
 import { useAuth } from '../context/AuthContext';
 import { useNavigate } from 'react-router-dom';
-import api from '../utils/api';
+import api, { errorMessage } from '../utils/api';
 import { toast } from 'sonner';
 import { PawPrint, Mail, Lock, User } from 'lucide-react';
 import { Button } from '../components/ui/button';
@@ -31,7 +31,7 @@ export default function Auth() {
       toast.success(isLogin ? 'Welcome back!' : 'Account created successfully!');
       navigate('/');
     } catch (error) {
-      toast.error(error.response?.data?.detail || 'An error occurred');
+      toast.error(errorMessage(error));
     } finally {
       setLoading(false);
     }
